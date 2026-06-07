@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" shape-rendering="crispEdges">
+  <rect width="64" height="64" rx="12" fill="#33ccff"/>
+  <!-- corps -->
+  <circle cx="30" cy="34" r="16" fill="#f7d51d"/>
+  <!-- ventre -->
+  <path d="M18 38a14 14 0 0 0 24 0z" fill="#fff6c8"/>
+  <!-- aile -->
+  <ellipse cx="24" cy="36" rx="7" ry="5" fill="#e8a200"/>
+  <!-- oeil -->
+  <circle cx="38" cy="28" r="7" fill="#fff"/>
+  <circle cx="40" cy="28" r="3" fill="#1b1b1f"/>
+  <!-- bec -->
+  <path d="M44 31h10l-4 4h-6z" fill="#ff7a00"/>
+</svg>
