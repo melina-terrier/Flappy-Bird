@@ -22,9 +22,9 @@ export class PipeManager {
    * Fait défiler les tuyaux, recycle ceux sortis à gauche et appelle
    * onScore() quand l'oiseau (en birdX) dépasse un tuyau.
    */
-  update(speed, birdX, onScore) {
+  update(speed, birdX, onScore, delta = 1) {
     for (const pipe of this.pipes) {
-      pipe.update(speed);
+      pipe.update(speed * delta);
 
       if (!pipe.passed && pipe.x < birdX) {
         pipe.passed = true;

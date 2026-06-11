@@ -42,8 +42,9 @@ export class Pipe extends Entity {
     this.passed = false;
   }
 
-  update(speed) {
-    this.x -= speed;
+  // dx = déplacement déjà multiplié par le delta-time
+  update(dx) {
+    this.x -= dx;
   }
 
   isOffScreen() {

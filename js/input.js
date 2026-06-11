@@ -14,12 +14,15 @@ export class InputManager {
     stage.hitArea = new PIXI.Rectangle(0, 0, CONFIG.SCREEN_WIDTH, CONFIG.SCREEN_HEIGHT);
     stage.on('pointerdown', () => this._action());
 
-    // Clavier
+    // Clavier : plusieurs touches pour « sauter », P/Échap pour la pause
+    const actionKeys = ['Space', 'ArrowUp', 'Enter', 'KeyW'];
+    const pauseKeys = ['KeyP', 'Escape'];
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault(); // évite de faire défiler la page
+      if (e.repeat) return; // ignore la répétition clavier (touche maintenue)
+      if (actionKeys.includes(e.code)) {
+        e.preventDefault(); // évite le défilement de la page (Espace / flèches)
         this._action();
-      } else if (e.code === 'KeyP' || e.code === 'Escape') {
+      } else if (pauseKeys.includes(e.code)) {
         e.preventDefault();
         this._pause();
       }

@@ -5,7 +5,8 @@
 
 ## 🚀 Lancer le projet
 
-Aucune installation nécessaire. PIXI.js et la police pixel sont chargés via CDN.
+Aucune installation nécessaire. PIXI.js (`vendor/`) et la police pixel
+(`assets/fonts/`) sont **auto-hébergés** — le jeu fonctionne sans connexion.
 Le code étant en **modules ES**, il faut le servir via HTTP (pas en `file://`) :
 
 ```bash
@@ -33,7 +34,8 @@ python3 -m http.server 8000
 
 ```
 .
-├── index.html              # Page + PIXI.js (CDN) + police pixel
+├── index.html              # Page + PIXI.js (auto-hébergé) + police pixel
+├── vendor/pixi.min.js      # PIXI.js auto-hébergé (pas de CDN)
 ├── js/
 │   ├── main.js             # Bootstrap : charge la police puis lance Game
 │   ├── config.js           # CONFIG : toutes les constantes du jeu
@@ -49,7 +51,9 @@ python3 -m http.server 8000
 │   └── game.js             # Game — orchestrateur (scène, entités, boucle)
 └── assets/
     ├── flappy_bird.png     # Spritesheet
-    └── flappy_bird.json    # Atlas TexturePacker
+    ├── flappy_bird.json    # Atlas TexturePacker
+    ├── favicon.svg         # Favicon
+    └── fonts/              # Police « Press Start 2P » auto-hébergée
 ```
 
 ### Notions POO illustrées

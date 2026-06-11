@@ -3,10 +3,13 @@ import { CONFIG } from './config.js';
 /**
  * Pattern State — chaque état du jeu est un objet avec enter / update / exit
  * et réagit aux entrées (handleAction / handlePause). Game délègue à l'état courant.
+ *
+ * update(game, delta) reçoit le delta-time du ticker PIXI (≈ 1 à 60 fps) pour
+ * que la vitesse réelle soit identique quel que soit le taux de rafraîchissement.
  */
 export class State {
   enter(game) {}
-  update(game) {}
+  update(game, delta = 1) {}
   exit(game) {}
   handleAction(game) {}
   handlePause(game) {}
@@ -17,9 +20,9 @@ export class ReadyState extends State {
   enter(game) {
     game.reset();
   }
-  update(game) {
-    game.scrollGround();
-    game.bird.updateFloating();
+  update(game, delta = 1) {
+    game.scrollGround(delta);
+    game.bird.updateFloating(delta);
   }
   handleAction(game) {
     game.changeState(game.states.countdown);
@@ -34,15 +37,21 @@ export class CountdownState extends State {
     this.frames = CONFIG.COUNTDOWN_FROM * CONFIG.COUNTDOWN_STEP_FRAMES;
     game.hud.showCountdown(CONFIG.COUNTDOWN_FROM);
   }
-  update(game) {
-    game.scrollGround();
-    game.bird.updateFloating();
-    this.frames--;
+  update(game, delta = 1) {
+    game.scrollGround(delta);
+    game.bird.updateFloating(delta);
+    this.frames -= delta;
     if (this.frames <= 0) {
       game.changeState(game.states.playing);
       return;
     }
     game.hud.showCountdown(Math.ceil(this.frames / CONFIG.COUNTDOWN_STEP_FRAMES));
+  }
+  // Appuyer pendant le décompte démarre tout de suite (et fait sauter l'oiseau)
+  handleAction(game) {
+    game.changeState(game.states.playing);
+    game.bird.jump();
+    game.sound.jump();
   }
   exit(game) {
     game.hud.hideCountdown();
@@ -57,14 +66,14 @@ export class PlayingState extends State {
     game.bird.velocityY = 0;
     game.hud.showBigScore();
   }
-  update(game) {
-    game.scrollGround();
-    game.bird.updatePlaying();
+  update(game, delta = 1) {
+    game.scrollGround(delta);
+    game.bird.updatePlaying(delta);
     if (game.checkCollisions()) {
       game.die();
       return;
     }
-    game.pipeManager.update(game.gameSpeed, game.bird.x, () => game.addPoint());
+    game.pipeManager.update(game.gameSpeed, game.bird.x, () => game.addPoint(), delta);
   }
   handleAction(game) {
     game.bird.jump();
@@ -100,8 +109,8 @@ export class GameOverState extends State {
     }
     game.hud.showGameOver(game.score, game.bestScore, isNewBest);
   }
-  update(game) {
-    game.bird.updateDying(game.groundTop());
+  update(game, delta = 1) {
+    game.bird.updateDying(game.groundTop(), delta);
   }
   handleAction(game) {
     game.changeState(game.states.ready);

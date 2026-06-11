@@ -10,39 +10,43 @@ const H = CONFIG.SCREEN_HEIGHT;
  */
 export class HUD {
   constructor(textures) {
-    this.container = new PIXI.Container();
+    // Deux couches pour gérer le z-order autour de l'oiseau :
+    //  - backLayer : « Get Ready » + compte à rebours → DERRIÈRE l'oiseau (il reste visible)
+    //  - frontLayer : score, game over, pause, flash → DEVANT l'oiseau
+    this.backLayer = new PIXI.Container();
+    this.frontLayer = new PIXI.Container();
     this._pop = 1; // facteur d'agrandissement du gros score (animation « pop »)
     this._replayCb = () => {};
 
-    // --- Écran « Get Ready » ---
+    // --- Écran « Get Ready » (derrière l'oiseau) ---
     this.getReady = new PIXI.Sprite(textures['get_ready.png']);
     this.getReady.anchor.set(0.5);
-    this.getReady.position.set(W / 2, H * 0.42);
-    this.container.addChild(this.getReady);
+    this.getReady.position.set(W / 2, H * 0.22); // remonté pour ne pas chevaucher l'oiseau
+    this.backLayer.addChild(this.getReady);
+
+    // --- Compte à rebours (derrière l'oiseau) ---
+    this.countdown = new PIXI.Text('', this._style(56, 8));
+    this.countdown.anchor.set(0.5);
+    this.countdown.position.set(W / 2, H * 0.3);
+    this.countdown.visible = false;
+    this.backLayer.addChild(this.countdown);
 
     // --- Score en bas à gauche ---
     this.scoreLabel = new PIXI.Text('Pts : 0', this._style(12));
     this.scoreLabel.position.set(10, H - 30);
-    this.container.addChild(this.scoreLabel);
+    this.frontLayer.addChild(this.scoreLabel);
 
     // --- Gros score central (pendant la partie) ---
     this.bigScore = new PIXI.Text('0', this._style(40, 6));
     this.bigScore.anchor.set(0.5);
     this.bigScore.position.set(W / 2, 90);
     this.bigScore.visible = false;
-    this.container.addChild(this.bigScore);
-
-    // --- Compte à rebours ---
-    this.countdown = new PIXI.Text('', this._style(56, 8));
-    this.countdown.anchor.set(0.5);
-    this.countdown.position.set(W / 2, H / 2);
-    this.countdown.visible = false;
-    this.container.addChild(this.countdown);
+    this.frontLayer.addChild(this.bigScore);
 
     // --- Panneau de game over ---
     this.gameOverPanel = this._buildGameOverPanel(textures);
     this.gameOverPanel.visible = false;
-    this.container.addChild(this.gameOverPanel);
+    this.frontLayer.addChild(this.gameOverPanel);
 
     // --- Overlay de pause ---
     this.pauseOverlay = new PIXI.Container();
@@ -53,13 +57,13 @@ export class HUD {
     pauseTxt.position.set(W / 2, H / 2);
     this.pauseOverlay.addChild(dim, pauseTxt);
     this.pauseOverlay.visible = false;
-    this.container.addChild(this.pauseOverlay);
+    this.frontLayer.addChild(this.pauseOverlay);
 
-    // --- Flash blanc (impact) ---
+    // --- Flash blanc (impact), tout au-dessus ---
     this.flashRect = new PIXI.Graphics();
     this.flashRect.beginFill(0xffffff).drawRect(0, 0, W, H).endFill();
     this.flashRect.alpha = 0;
-    this.container.addChild(this.flashRect);
+    this.frontLayer.addChild(this.flashRect);
   }
 
   // Style de texte commun (police pixel + contour)
@@ -131,7 +135,7 @@ export class HUD {
     this.replayBtn.addChild(btnBg, btnTxt);
     this.replayBtn.position.set(0, 115);
     this.replayBtn.interactive = true;
-    this.replayBtn.buttonMode = true;
+    this.replayBtn.cursor = 'pointer'; // curseur main (compatible PIXI v5 et v7)
     this.replayBtn.on('pointerdown', (e) => {
       e.stopPropagation(); // empêche le clic « jouer » global de se déclencher aussi
       this._replayCb();
@@ -145,12 +149,12 @@ export class HUD {
     this._replayCb = fn;
   }
 
-  // Animations par frame (pop du score + disparition du flash)
-  update() {
-    this._pop += (1 - this._pop) * 0.2;
+  // Animations par frame (pop du score + disparition du flash), pondérées par delta
+  update(delta = 1) {
+    this._pop += (1 - this._pop) * 0.2 * delta;
     this.bigScore.scale.set(this._pop);
     if (this.flashRect.alpha > 0) {
-      this.flashRect.alpha = Math.max(0, this.flashRect.alpha - 0.06);
+      this.flashRect.alpha = Math.max(0, this.flashRect.alpha - 0.06 * delta);
     }
   }
 
@@ -213,15 +217,66 @@ export class HUD {
     this.getReady.visible = true;
   }
 
+  // Éclaircit (f > 1) ou assombrit (f < 1) une couleur hexadécimale
+  _shade(color, f) {
+    const r = Math.min(255, Math.round(((color >> 16) & 0xff) * f));
+    const g = Math.min(255, Math.round(((color >> 8) & 0xff) * f));
+    const b = Math.min(255, Math.round((color & 0xff) * f));
+    return (r << 16) | (g << 8) | b;
+  }
+
+  // Points (tableau plat x,y,…) d'une étoile à `spikes` branches, pointe en haut
+  _starPoints(spikes, outer, inner) {
+    const pts = [];
+    let rot = -Math.PI / 2;
+    const step = Math.PI / spikes;
+    for (let i = 0; i < spikes; i++) {
+      pts.push(Math.cos(rot) * outer, Math.sin(rot) * outer); rot += step;
+      pts.push(Math.cos(rot) * inner, Math.sin(rot) * inner); rot += step;
+    }
+    return pts;
+  }
+
+  // Dessine une médaille « métallique » : tranche + biseau, faux dégradé
+  // lumière/ombre, anneau gravé, étoile centrale et reflet.
   _drawMedal(score) {
-    this.medal.clear();
+    const g = this.medal;
+    g.clear();
     const medal = CONFIG.MEDALS.find((m) => score >= m.min);
     if (!medal) {
-      this.medal.visible = false;
+      g.visible = false;
       return;
     }
-    this.medal.visible = true;
-    this.medal.lineStyle(3, 0xffffff, 0.6).beginFill(medal.color).drawCircle(0, 0, 24).endFill();
-    this.medal.lineStyle(0).beginFill(0x000000, 0.12).drawCircle(0, 0, 13).endFill();
+    g.visible = true;
+
+    const base = medal.color;
+    const rimEdge = this._shade(base, 0.45); // tranche extérieure
+    const rim = this._shade(base, 0.62);     // rebord métallique
+    const faceLo = this._shade(base, 0.85);  // bas (ombre)
+    const faceHi = this._shade(base, 1.18);  // haut (lumière)
+    const star = this._shade(base, 1.4);     // étoile claire
+
+    // Rebord (tranche foncée + biseau)
+    g.lineStyle(0);
+    g.beginFill(rimEdge).drawCircle(0, 0, 27).endFill();
+    g.beginFill(rim).drawCircle(0, 0, 26).endFill();
+
+    // Face : disque sombre, disque clair décalé vers le haut, puis couleur de base
+    g.beginFill(faceLo).drawCircle(0, 0, 23).endFill();
+    g.beginFill(faceHi).drawCircle(0, -2, 21).endFill();
+    g.beginFill(base).drawCircle(0, 0, 19).endFill();
+
+    // Anneau gravé juste à l'intérieur du rebord
+    g.lineStyle(1.5, rim, 0.9).drawCircle(0, 0, 20);
+    g.lineStyle(0);
+
+    // Étoile centrale gravée (remplissage clair + léger contour pour le relief)
+    const pts = this._starPoints(5, 14, 6);
+    g.beginFill(star).drawPolygon(pts).endFill();
+    g.lineStyle(1, rim, 0.6).drawPolygon(pts);
+    g.lineStyle(0);
+
+    // Reflet (brillance) en haut à gauche
+    g.beginFill(0xffffff, 0.5).drawCircle(-7, -8, 4).endFill();
   }
 }

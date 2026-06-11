@@ -30,9 +30,12 @@ export const CONFIG = {
   GROUND_PATTERN: 120, // largeur du motif répété du sol
   PARALLAX_FACTOR: 0.3, // le fond défile à 30 % de la vitesse du sol
 
-  // Compte à rebours avant le départ
+  // Compte à rebours avant le départ.
+  // Exprimé en « unités de temps » (1 unité = 1 frame à 60 fps). Le jeu utilise
+  // le delta-time du ticker : la durée réelle est donc identique quel que soit
+  // le taux de rafraîchissement de l'écran (60 / 120 / 144 Hz…).
   COUNTDOWN_FROM: 3,
-  COUNTDOWN_STEP_FRAMES: 40, // ~0,66 s par chiffre à 60 fps
+  COUNTDOWN_STEP_FRAMES: 40, // ~0,66 s par chiffre (≈ 2 s au total)
 
   // Médailles selon le score
   MEDALS: [

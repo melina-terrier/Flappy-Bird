@@ -16,7 +16,7 @@ export class Game {
   constructor() {
     this.score = 0;
     this.gameSpeed = CONFIG.START_SPEED;
-    this.bestScore = Number(localStorage.getItem(CONFIG.BEST_SCORE_KEY)) || 0;
+    this.bestScore = this._loadBest();
 
     this.app = new PIXI.Application({
       width: CONFIG.SCREEN_WIDTH,
@@ -24,6 +24,9 @@ export class Game {
       backgroundColor: CONFIG.BG_COLOR,
     });
     document.body.appendChild(this.app.view);
+    // Accessibilité : nom du canvas pour les lecteurs d'écran
+    this.app.view.setAttribute('aria-label',
+      'Jeu Flappy Bird — appuyez sur Espace, cliquez ou touchez l’écran pour faire voler l’oiseau');
     this._fit();
     window.addEventListener('resize', () => this._fit());
 
@@ -56,13 +59,16 @@ export class Game {
     this.ground.y = CONFIG.SCREEN_HEIGHT - this.ground.height * 0.7;
     this.app.stage.addChild(this.ground);
 
-    // Oiseau
+    // Interface — couche ARRIÈRE (Get Ready / compte à rebours), sous l'oiseau
+    this.hud = new HUD(t);
+    this.app.stage.addChild(this.hud.backLayer);
+
+    // Oiseau (au-dessus de l'écran « Get Ready » → toujours visible)
     this.bird = new Bird(t, CONFIG.SCREEN_WIDTH * CONFIG.BIRD_X_RATIO, CONFIG.SCREEN_HEIGHT * 0.5);
     this.app.stage.addChild(this.bird.sprite);
 
-    // Interface (au-dessus de tout)
-    this.hud = new HUD(t);
-    this.app.stage.addChild(this.hud.container);
+    // Interface — couche AVANT (score, game over, pause, flash), au-dessus de tout
+    this.app.stage.addChild(this.hud.frontLayer);
     this.hud.onReplay(() => this.handleAction());
 
     // Son et entrées
@@ -70,6 +76,13 @@ export class Game {
     this.input = new InputManager(this.app.stage);
     this.input.onAction(() => this.handleAction());
     this.input.onPause(() => this.handlePause());
+
+    // Pause automatique quand on quitte l'onglet (évite un saut de physique au retour)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.currentState === this.states.playing) {
+        this.handlePause();
+      }
+    });
 
     // États (pattern State)
     this.states = {
@@ -81,10 +94,14 @@ export class Game {
     };
     this.currentState = null;
 
-    // Boucle de jeu
-    this.app.ticker.add(() => {
-      this.hud.update();
-      this.currentState.update(this);
+    // Boucle de jeu : delta-time + filet de sécurité contre une exception
+    this.app.ticker.add((delta) => {
+      try {
+        this.hud.update(delta);
+        this.currentState.update(this, delta);
+      } catch (e) {
+        console.error('Erreur dans la boucle de jeu :', e);
+      }
     });
 
     this.changeState(this.states.ready);
@@ -113,12 +130,12 @@ export class Game {
     this.hud.reset();
   }
 
-  scrollGround() {
-    this.ground.x -= this.gameSpeed;
+  scrollGround(delta = 1) {
+    this.ground.x -= this.gameSpeed * delta;
     this.ground.x %= CONFIG.GROUND_PATTERN;
 
     // Parallaxe : le fond défile plus lentement que le sol, et boucle
-    const dx = this.gameSpeed * CONFIG.PARALLAX_FACTOR;
+    const dx = this.gameSpeed * CONFIG.PARALLAX_FACTOR * delta;
     this.bg1.x -= dx;
     this.bg2.x -= dx;
     if (this.bg1.x <= -this.bgWidth) this.bg1.x = this.bg2.x + this.bgWidth;
@@ -146,6 +163,16 @@ export class Game {
 
   groundTop() {
     return this.ground.y - this.bird.sprite.height * 0.5;
+  }
+
+  // Lecture protégée : localStorage peut lever (navigation privée, stockage bloqué)
+  _loadBest() {
+    try {
+      return Number(localStorage.getItem(CONFIG.BEST_SCORE_KEY)) || 0;
+    } catch (e) {
+      /* localStorage indisponible : on démarre sans meilleur score */
+      return 0;
+    }
   }
 
   saveBest() {
