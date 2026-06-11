@@ -4,8 +4,6 @@
 
 **▶️ Démo : [flappybird.melinaterrier.fr](https://flappybird.melinaterrier.fr)**
 
-![Aperçu du jeu](assets/og-image.png)
-
 ## 🎮 Contrôles
 
 | Touche / geste          | Action                      |
